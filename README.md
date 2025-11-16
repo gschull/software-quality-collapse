@@ -22,6 +22,11 @@ npm run quality:ci
 ## Use as a GitHub Action
 See the composite action in the parent project, or copy the sample workflow in `.github/workflows/quality-gate.yml` if you extracted this into its own repo.
 
+## Tweak Gates Quickly
+- Python mutation threshold: set `PY_MUTATION_MIN` in the workflow (default 90)
+- Java mutation threshold: set `JAVA_MUTATION_MIN` in the workflow (default 90)
+- Java dep health sensitivity: set `JAVA_DEP_HEALTH_FAIL_CVSS` (default 0.1 = fail on any known vuln)
+
 ## Why it matters
 - Stronger tests catch real bugs (not just higher coverage numbers)
 - Performance budgets prevent slowdowns from sneaking into PRs
