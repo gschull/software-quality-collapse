@@ -95,6 +95,31 @@ async def trends():
         return tmpl.render(rows=rows)
 
 
+    @app.get("/api/series")
+    async def api_series(limit: int = 1000):
+        con = get_conn()
+        # Aggregate by date for average mutation and max CVSS per ecosystem
+        q = (
+            "SELECT substr(created_at,1,10) AS day, ecosystem, "
+            "ROUND(AVG(mutation_score),2) AS avg_mutation, "
+            "ROUND(MAX(max_cvss),1) AS max_cvss "
+            "FROM (SELECT * FROM events ORDER BY id DESC LIMIT ?) e "
+            "GROUP BY day, ecosystem ORDER BY day"
+        )
+        rows = con.execute(q, (limit,)).fetchall()
+        con.close()
+        # Shape into {ecosystem: [{day, avg_mutation, max_cvss}, ...]}
+        series = {}
+        for r in rows:
+            eco = r["ecosystem"]
+            series.setdefault(eco, []).append({
+                "day": r["day"],
+                "avg_mutation": float(r["avg_mutation"] or 0),
+                "max_cvss": float(r["max_cvss"] or 0)
+            })
+        return series
+
+
 @app.post("/ingest")
 async def ingest(request: Request, authorization: Optional[str] = Header(None)):
     # ELI5: This is a mailbox. The CI sends us a summary. We stamp it with time

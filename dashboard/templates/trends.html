@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+      <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Quality Gate Trends</title>
@@ -39,5 +40,65 @@
         {% endfor %}
       </tbody>
     </table>
+
+    <h2>Charts</h2>
+    <p>ELI5: Lines go up = stronger tests. Spikes in CVSS = riskier dependencies.</p>
+    <div style="display:flex; gap:24px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:320px;">
+        <h3>Average Mutation Score</h3>
+        <canvas id="mutChart" height="160"></canvas>
+      </div>
+      <div style="flex:1; min-width:320px;">
+        <h3>Max CVSS</h3>
+        <canvas id="cvssChart" height="160"></canvas>
+      </div>
+    </div>
+
+    <script>
+      async function loadSeries() {
+        const res = await fetch('/api/series');
+        return await res.json();
+      }
+      function buildLineChart(ctx, labels, datasets, title) {
+        return new Chart(ctx, {
+          type: 'line',
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+      }
+      function palette(i){
+        const colors = ['#0b57d0','#1e8e3e','#b80672','#b06000','#8e24aa','#0288d1'];
+        return colors[i % colors.length];
+      }
+      (async () => {
+        const series = await loadSeries();
+        const ecosystems = Object.keys(series);
+        const allDays = Array.from(new Set([].concat(...ecosystems.map(e=>series[e].map(x=>x.day))))).sort();
+        const mutDatasets = ecosystems.map((e,i)=>({
+          label: e,
+          data: allDays.map(day=>{
+            const pt = series[e].find(x=>x.day===day);
+            return pt?pt.avg_mutation: null;
+          }),
+          borderColor: palette(i),
+          backgroundColor: palette(i)+'33'
+        }));
+        const cvssDatasets = ecosystems.map((e,i)=>({
+          label: e,
+          data: allDays.map(day=>{
+            const pt = series[e].find(x=>x.day===day);
+            return pt?pt.max_cvss: null;
+          }),
+          borderColor: palette(i),
+          backgroundColor: palette(i)+'33'
+        }));
+        buildLineChart(document.getElementById('mutChart'), allDays, mutDatasets);
+        buildLineChart(document.getElementById('cvssChart'), allDays, cvssDatasets);
+      })();
+    </script>
   </body>
   </html>

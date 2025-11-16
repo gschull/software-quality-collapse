@@ -70,7 +70,7 @@ ELI5: Think of it like sending a scoreboard update. No code leaves your repo, ju
   ```yaml
   jobs:
     quality-gate:
-      uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@v0.2.0
+      uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@v0.3.0
       with:
         py_mutation_min: '80'
         py_dep_health_fail: 'true'
