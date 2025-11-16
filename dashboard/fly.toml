@@ -1,14 +1,14 @@
 app = "quality-gate-dashboard-gschull"
 
 [build]
-  dockerfile = "dashboard/Dockerfile"
+  dockerfile = "Dockerfile"
 
 [env]
   INGEST_TOKEN = "change-me"
   DATABASE_URL = "/data/metrics.db"
 
 [http_service]
-  internal_port = 8000
+  internal_port = 8080
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true
