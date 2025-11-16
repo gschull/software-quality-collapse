@@ -74,6 +74,46 @@ jobs:
       - name: Run Quality Gate
         run: npm run quality:ci
 
+      - name: Collect Node metrics (Stryker + Lighthouse)
+        run: |
+          node -e "
+          const fs=require('fs'), path=require('path');
+          function readJson(p){ try { return JSON.parse(fs.readFileSync(p,'utf8')); } catch { return null; } }
+          const out={ ecosystem:'node', mutation:{ score:null }, perf:{ score:null } };
+          // Stryker JSON (if available)
+          const mut = readJson('reports/mutation/mutation.json') || readJson('reports/mutation/mutations.json') || readJson('reports/mutation/mutation-report.json');
+          if (mut) {
+            const ms = (mut.mutationScore ?? (mut.systemUnderTestMetrics && mut.systemUnderTestMetrics.metrics && mut.systemUnderTestMetrics.metrics.mutationScore) ?? (mut.metrics && mut.metrics.mutationScore) ?? null);
+            if (ms !== null && ms !== undefined) {
+              out.mutation.score = Math.round(Number(ms) * 100) / 100;
+            }
+          }
+          // Lighthouse CI (.lighthouseci/*.json)
+          const dir = '.lighthouseci';
+          if (fs.existsSync(dir)) {
+            const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+            let best = null, bestScore = null;
+            for (const f of files) {
+              const j = readJson(path.join(dir, f));
+              const s = j && j.categories && j.categories.performance && j.categories.performance.score;
+              if (typeof s === 'number') {
+                if (bestScore === null || s > bestScore) { bestScore = s; best = j; }
+              }
+            }
+            if (bestScore !== null) {
+              out.perf.score = Math.round(bestScore * 100) / 100;
+            }
+          }
+          fs.writeFileSync('node_metrics.json', JSON.stringify(out));
+          console.log(JSON.stringify(out, null, 2));
+          "
+
+      - name: Upload Node metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-metrics
+          path: poc/node-quality-gate/node_metrics.json
+
   python:
     name: Python Quality Gate
     runs-on: ubuntu-latest
@@ -368,12 +408,15 @@ jobs:
         with:
           pattern: "*-metrics"
           merge-multiple: true
+      - name: Verify downloaded metrics
+        run: ls -la
       - name: Build combined metrics
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             function readJson(p) { try { return JSON.parse(fs.readFileSync(p,'utf8')); } catch { return null; } }
+            const no = readJson('node_metrics.json');
             const py = readJson('python_metrics.json');
             const ja = readJson('java_metrics.json');
             const {context} = require('@actions/github');
@@ -382,6 +425,7 @@ jobs:
               pr_number: context.issue.number,
               commit_sha: context.payload.pull_request?.head?.sha,
               run_id: context.runId,
+              node: no,
               python: py,
               java: ja,
               generated_at: new Date().toISOString()
@@ -394,19 +438,22 @@ jobs:
           script: |
             const fs = require('fs');
             function readJson(p) { try { return JSON.parse(fs.readFileSync(p,'utf8')); } catch { return null; } }
+            const no = readJson('node_metrics.json');
             const py = readJson('python_metrics.json');
             const ja = readJson('java_metrics.json');
             function row(label, obj) {
               if (!obj) return `| ${label} | – | – | – | – |`;
               const m = obj.mutation||{};
               const d = obj.dependencies||{};
-              return `| ${label} | ${m.score ?? '–'}% | C:${d.critical||0} H:${d.high||0} M:${d.moderate||0} L:${d.low||0} | max CVSS ${d.max_cvss||0} |`;
+              const perf = obj.perf && obj.perf.score != null ? ` | perf ${obj.perf.score}` : '';
+              return `| ${label} | ${m.score ?? '–'}% | C:${d.critical||0} H:${d.high||0} M:${d.moderate||0} L:${d.low||0} | max CVSS ${d.max_cvss||0}${perf} |`;
             }
             const body = [
               '## Quality Gate Summary',
               '',
               '| Ecosystem | Mutation Score | Vulns (C/H/M/L) | Notes |',
               '|---|---:|---:|---|',
+              row('Node', no),
               row('Python', py),
               row('Java', ja),
               '',
