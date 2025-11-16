@@ -42,7 +42,7 @@ jobs:
       run:
         working-directory: poc/python-quality-gate
     env:
-      PY_MUTATION_MIN: '80'
+      PY_MUTATION_MIN: '90'
       PY_DEP_HEALTH_FAIL: 'true'
     steps:
       - name: Checkout
@@ -87,7 +87,7 @@ jobs:
           import os, sqlite3, sys
           # ELI5: We open mutmut's hidden database to count how many mutations were killed
           # and calculate a score. If the score is below the required number, we fail.
-          threshold = float(os.environ.get('PY_MUTATION_MIN', '80'))
+          threshold = float(os.environ.get('PY_MUTATION_MIN', '90'))
           db_path = '.mutmut-cache'
           try:
             con = sqlite3.connect(db_path)
@@ -124,8 +124,8 @@ jobs:
       run:
         working-directory: poc/java-quality-gate
     env:
-      JAVA_MUTATION_MIN: '80'
-      JAVA_DEP_HEALTH_FAIL_CVSS: '5.0'
+      JAVA_MUTATION_MIN: '90'
+      JAVA_DEP_HEALTH_FAIL_CVSS: '0.1'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
