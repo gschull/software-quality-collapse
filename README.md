@@ -52,6 +52,42 @@ jobs:
 - Auto-summary comment with mutation scores and dependency risk (Python/Java)
 - Strict but adjustable gates (start at 80% / CVSS 5.0 and raise)
 
+## Optional: Send Results to a Dashboard
+ELI5: Think of it like sending a scoreboard update. No code leaves your repo, just the scores.
+
+- Run the mini dashboard locally or in Docker:
+  ```bash
+  docker build -t quality-gate-dashboard -f dashboard/Dockerfile .
+  docker run -p 8000:8000 -e INGEST_TOKEN=your-secret quality-gate-dashboard
+  # Visit http://localhost:8000
+  ```
+
+- Enable uploads in your workflow call by adding inputs and a secret token:
+  ```yaml
+  jobs:
+    quality-gate:
+      uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@v0.1.0
+      with:
+        py_mutation_min: '80'
+        py_dep_health_fail: 'true'
+        java_mutation_min: '80'
+        java_cvss_threshold: '5.0'
+        upload_results: 'true'
+        upload_url: 'https://your-host/ingest'
+      secrets:
+        upload_token: ${{ secrets.QUALITY_GATE_INGEST_TOKEN }}
+  ```
+
+Data sent: repo, PR number, commit SHA, mutation scores (Python/Java), vulnerability counts, max CVSS.
+
+## Org-wide Rollout Script
+Use the helper script to open PRs across many repos (requires GitHub CLI):
+
+```powershell
+cd scripts
+./rollout-quality-gate.ps1 -Org "YOUR_ORG" -Limit 20 -BranchName "chore/add-quality-gate"
+```
+
 ## Contributing
 - Start with the Node POC, then adapt thresholds and scripts for your project
 - PRs welcome for additional languages and checks (Go, Rust, .NET)
