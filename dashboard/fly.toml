@@ -1,4 +1,4 @@
-app = "your-app-name-here"
+app = "quality-gate-dashboard-gschull"
 
 [build]
   dockerfile = "dashboard/Dockerfile"
