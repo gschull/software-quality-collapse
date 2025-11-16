@@ -48,6 +48,10 @@ jobs:
 - Performance budgets prevent slowdowns from sneaking into PRs
 - Dependency health reduces supply chain risk
 
+## What you’ll see on PRs
+- Auto-summary comment with mutation scores and dependency risk (Python/Java)
+- Strict but adjustable gates (start at 80% / CVSS 5.0 and raise)
+
 ## Contributing
 - Start with the Node POC, then adapt thresholds and scripts for your project
 - PRs welcome for additional languages and checks (Go, Rust, .NET)
