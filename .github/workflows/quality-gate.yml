@@ -11,3 +11,7 @@ jobs:
       py_dep_health_fail: 'true'
       java_mutation_min: '80'
       java_cvss_threshold: '5.0'
+      upload_results: 'true'
+      upload_url: ${{ vars.QG_UPLOAD_URL }}
+    secrets:
+      upload_token: ${{ secrets.QUALITY_GATE_INGEST_TOKEN }}
