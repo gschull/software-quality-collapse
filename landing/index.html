@@ -503,6 +503,20 @@
             </form>
             <p style="margin-top: 20px; font-size: 0.9rem; opacity: 0.8;">
                 We'll email you when we're ready. ~2-3 weeks. Privacy-first, no spam.
+            
+                        <!-- ROI Calculator -->
+                        <div style="background: rgba(255,255,255,0.1); border-radius: 12px; padding: 40px; margin-top: 60px; max-width: 600px; margin-left: auto; margin-right: auto;">
+                            <h3 style="margin-bottom: 20px;">Calculate Your ROI</h3>
+                            <label style="display: block; margin-bottom: 10px; font-size: 1.1rem;">
+                                Team Size: <span id="team-size-display">25</span> developers
+                            </label>
+                            <input type="range" id="team-size" min="5" max="500" value="25" step="5" 
+                                   style="width: 100%; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.3); cursor: pointer;">
+                
+                            <div id="roi-result" style="margin-top: 30px; font-size: 1.2rem; line-height: 1.8;">
+                                <!-- Results populated by JavaScript -->
+                            </div>
+                        </div>
             </p>
         </div>
     </section>
@@ -528,6 +542,44 @@
                     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             });
+        
+                // ROI Calculator
+                const teamSizeInput = document.getElementById('team-size');
+                const teamSizeDisplay = document.getElementById('team-size-display');
+                const roiResult = document.getElementById('roi-result');
+        
+                async function updateROI() {
+                    const teamSize = teamSizeInput.value;
+                    teamSizeDisplay.textContent = teamSize;
+            
+                    // For production: fetch from /api/roi
+                    // For demo: calculate client-side
+                    const pricePerDev = 10;
+                    const costPerMonth = teamSize * pricePerDev;
+                    const costPerYear = costPerMonth * 12;
+            
+                    const hoursPerDevPerSprint = 2;
+                    const sprintsPerYear = 24;
+                    const hourlyRate = 75;
+                    const incidentsPrevented = 1;
+                    const incidentCost = 50000;
+            
+                    const timeSavings = teamSize * hoursPerDevPerSprint * sprintsPerYear * hourlyRate;
+                    const incidentSavings = incidentsPrevented * incidentCost;
+                    const totalValue = timeSavings + incidentSavings;
+                    const roiMultiple = (totalValue / costPerYear).toFixed(1);
+                    const paybackDays = Math.round(365 / roiMultiple);
+            
+                    roiResult.innerHTML = `
+                        <strong>Cost:</strong> $${costPerMonth.toLocaleString()}/month ($${costPerYear.toLocaleString()}/year)<br>
+                        <strong>Value:</strong> $${totalValue.toLocaleString()}/year saved<br>
+                        <strong>ROI:</strong> <span style="font-size: 1.5em; color: #FFD700;">${roiMultiple}x return</span><br>
+                        <strong>Payback:</strong> ${paybackDays} days
+                    `;
+                }
+        
+                teamSizeInput.addEventListener('input', updateROI);
+                updateROI(); // Initial calculation
         });
     </script>
 </body>

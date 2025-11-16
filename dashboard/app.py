@@ -3,8 +3,8 @@ import sqlite3
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-from fastapi import FastAPI, Request, Header, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request, Header, HTTPException, Query
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -44,6 +44,23 @@ def init_db():
             max_cvss REAL,
             run_id INTEGER,
             created_at TEXT NOT NULL
+            con.execute(
+                """
+                CREATE TABLE IF NOT EXISTS customers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL UNIQUE,
+                    stripe_customer_id TEXT UNIQUE,
+                    stripe_subscription_id TEXT UNIQUE,
+                    plan TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    canceled_at TEXT,
+                    metadata TEXT
+                )
+                """
+            )
+            con.execute("CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)")
+            con.execute("CREATE INDEX IF NOT EXISTS idx_customers_stripe_customer_id ON customers(stripe_customer_id)")
         )
         """
     )
@@ -169,3 +186,138 @@ async def ingest(request: Request, authorization: Optional[str] = Header(None)):
     finally:
         con.close()
     return JSONResponse({"status": "stored", "repository": repo, "pr_number": pr_number})
+
+
+@app.get("/billing")
+async def billing_portal(email: str = Query(..., description="Customer email address")):
+    """Redirect to Stripe billing portal for customer to manage subscription"""
+    con = get_conn()
+    customer = con.execute("SELECT * FROM customers WHERE email = ?", (email,)).fetchone()
+    con.close()
+    
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found. Please contact support.")
+    
+    # For MVP, return simple page with manual instructions
+    # Later: integrate stripe.billing_portal.Session.create()
+    html = f"""
+    <html>
+    <head><title>Billing Portal</title></head>
+    <body style="font-family: sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+        <h1>Billing Portal (MVP)</h1>
+        <p><strong>Email:</strong> {customer['email']}</p>
+        <p><strong>Plan:</strong> {customer['plan']}</p>
+        <p><strong>Status:</strong> {customer['status']}</p>
+        <p><strong>Created:</strong> {customer['created_at']}</p>
+        <hr>
+        <h3>To Update Payment Method or Cancel:</h3>
+        <p>Please email <a href="mailto:billing@quality-gate.dev">billing@quality-gate.dev</a> with your request.</p>
+        <p><small>Self-service billing portal coming soon (Stripe integration in progress).</small></p>
+    </body>
+    </html>
+    """
+    return HTMLResponse(html)
+
+
+@app.get("/api/pricing")
+async def get_pricing():
+    """Return pricing tiers for landing page"""
+    return {
+        "pro": {
+            "price_per_dev": 10,
+            "min_seats": 5,
+            "billing": "monthly",
+            "features": [
+                "Hosted dashboard",
+                "90-day trend history",
+                "Slack/Discord webhooks",
+                "Email support (48h SLA)",
+                "Private repos"
+            ]
+        },
+        "team": {
+            "price_per_dev": 15,
+            "min_seats": 20,
+            "billing": "monthly",
+            "features": [
+                "Everything in Pro",
+                "Org-wide policy management",
+                "SAML SSO",
+                "Audit logs",
+                "Priority support (24h SLA)",
+                "1-year history"
+            ]
+        },
+        "enterprise": {
+            "price_per_dev": 30,
+            "min_seats": 200,
+            "billing": "custom",
+            "features": [
+                "Everything in Team",
+                "On-premises deployment",
+                "Compliance reports (SOC 2, HIPAA)",
+                "White-label dashboard",
+                "Dedicated CSM",
+                "Unlimited history"
+            ]
+        }
+    }
+
+
+@app.get("/api/roi")
+async def calculate_roi(
+    team_size: int = Query(25, ge=1, le=10000),
+    plan: str = Query("pro", regex="^(pro|team|enterprise)$")
+):
+    """Calculate ROI for pricing calculator on landing page"""
+    prices = {"pro": 10, "team": 15, "enterprise": 30}
+    cost_per_month = team_size * prices[plan]
+    
+    # Research-backed assumptions (from blog post analysis)
+    hours_saved_per_dev_per_sprint = 2
+    sprints_per_year = 24
+    hourly_rate = 75
+    incidents_prevented_per_year = 1
+    incident_cost = 50000
+    
+    time_savings_per_year = team_size * hours_saved_per_dev_per_sprint * sprints_per_year * hourly_rate
+    incident_savings_per_year = incidents_prevented_per_year * incident_cost
+    total_value_per_year = time_savings_per_year + incident_savings_per_year
+    
+    cost_per_year = cost_per_month * 12
+    roi_multiple = round(total_value_per_year / cost_per_year, 1) if cost_per_year > 0 else 0
+    payback_period_days = round(365 / roi_multiple, 0) if roi_multiple > 0 else 365
+    
+    return {
+        "inputs": {
+            "team_size": team_size,
+            "plan": plan
+        },
+        "costs": {
+            "per_month": cost_per_month,
+            "per_year": cost_per_year
+        },
+        "savings": {
+            "time_savings_per_year": time_savings_per_year,
+            "incident_savings_per_year": incident_savings_per_year,
+            "total_value_per_year": total_value_per_year
+        },
+        "roi": {
+            "multiple": roi_multiple,
+            "payback_period_days": int(payback_period_days),
+            "annual_return_percentage": round((roi_multiple - 1) * 100, 0)
+        }
+    }
+
+
+@app.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events (subscription lifecycle)"""
+    # For MVP, just log events; full Stripe integration in STRIPE_SETUP.md
+    payload = await request.json()
+    event_type = payload.get("type")
+    
+    # In production: verify webhook signature, handle events
+    # See docs/STRIPE_SETUP.md for full implementation
+    
+    return {"received": True, "event_type": event_type}
