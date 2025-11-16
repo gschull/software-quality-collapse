@@ -1,0 +1,44 @@
+name: Deploy Dashboard
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: Fly.io app name (must be globally unique)
+        required: true
+        type: string
+      region:
+        description: Fly.io region (e.g., ord, sjc, fra)
+        required: false
+        default: ord
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@v1
+
+      - name: Launch app (first run creates app)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl apps list > /dev/null 2>&1 || true
+          flyctl launch \
+            --name "${{ inputs.app_name }}" \
+            --region "${{ inputs.region }}" \
+            --copy-config \
+            --no-deploy \
+            --path dashboard \
+            --now \
+            || true
+
+      - name: Deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl deploy --path dashboard --build-arg INGEST_TOKEN=change-me --config dashboard/fly.toml --detach || flyctl deploy --path dashboard --detach

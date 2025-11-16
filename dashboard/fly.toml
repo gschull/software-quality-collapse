@@ -1,0 +1,15 @@
+app = "your-app-name-here"
+
+[build]
+  dockerfile = "dashboard/Dockerfile"
+
+[env]
+  INGEST_TOKEN = "change-me"
+  DATABASE_URL = "/data/metrics.db"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
