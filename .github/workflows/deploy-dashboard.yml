@@ -27,18 +27,16 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          flyctl apps list > /dev/null 2>&1 || true
-          flyctl launch \
+          cd dashboard
+          flyctl launch --yes \
             --name "${{ inputs.app_name }}" \
             --region "${{ inputs.region }}" \
             --copy-config \
-            --no-deploy \
-            --path dashboard \
-            --now \
-            || true
+            --no-deploy || true
 
       - name: Deploy
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          flyctl deploy --path dashboard --build-arg INGEST_TOKEN=change-me --config dashboard/fly.toml --detach || flyctl deploy --path dashboard --detach
+          cd dashboard
+          flyctl deploy --detach
