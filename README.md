@@ -28,19 +28,19 @@ See the composite action in the parent project, or copy the sample workflow in `
 - Java dep health sensitivity: set `JAVA_DEP_HEALTH_FAIL_CVSS` (default 0.1 = fail on any known vuln)
 
 ## Reusable Workflow (with inputs)
-You can call the reusable workflow and override thresholds without editing jobs:
+You can call the reusable workflow and override thresholds without editing jobs. For an initial rollout (more forgiving), try 80% and CVSS 5.0:
 
 ```yaml
 name: Quality Gate
 on: pull_request
 jobs:
   quality-gate:
-    uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@main
+    uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@v0.1.0
     with:
-      py_mutation_min: '90'         # Python mutmut minimum %
+      py_mutation_min: '80'         # Python mutmut minimum % (initial rollout)
       py_dep_health_fail: 'true'    # pip-audit --strict
-      java_mutation_min: '90'       # Java PIT minimum %
-      java_cvss_threshold: '0.1'    # Fail on CVSS >= 0.1
+      java_mutation_min: '80'       # Java PIT minimum % (initial rollout)
+      java_cvss_threshold: '5.0'    # Fail on CVSS >= 5.0 (medium+)
 ```
 
 ## Why it matters

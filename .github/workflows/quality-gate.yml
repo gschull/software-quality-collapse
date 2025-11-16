@@ -5,9 +5,9 @@ on:
 
 jobs:
   quality-gate:
-    uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@main
+    uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@v0.1.0
     with:
-      py_mutation_min: '90'
+      py_mutation_min: '80'
       py_dep_health_fail: 'true'
-      java_mutation_min: '90'
-      java_cvss_threshold: '0.1'
+      java_mutation_min: '80'
+      java_cvss_threshold: '5.0'
