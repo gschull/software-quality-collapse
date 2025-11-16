@@ -19,11 +19,21 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PAGES_ADMIN_TOKEN: ${{ secrets.PAGES_ADMIN_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Pages (admin token)
+        if: ${{ env.PAGES_ADMIN_TOKEN != '' }}
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+          token: ${{ env.PAGES_ADMIN_TOKEN }}
+
       - name: Setup Pages
+        if: ${{ env.PAGES_ADMIN_TOKEN == '' }}
         uses: actions/configure-pages@v5
         with:
           enablement: true
