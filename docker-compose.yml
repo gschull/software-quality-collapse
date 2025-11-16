@@ -1,0 +1,16 @@
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    environment:
+      - INGEST_TOKEN=${INGEST_TOKEN:-change-me}
+      - DATABASE_URL=/data/metrics.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+volumes:
+  data:

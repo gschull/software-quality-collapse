@@ -73,6 +73,28 @@ async def index():
     return tmpl.render(rows=rows)
 
 
+@app.get("/trends", response_class=HTMLResponse)
+async def trends():
+        con = get_conn()
+        # Compute simple aggregates per repo and ecosystem on recent window
+        rows = con.execute(
+                """
+                SELECT repository, ecosystem,
+                             ROUND(AVG(mutation_score),2) AS avg_mutation,
+                             ROUND(MAX(max_cvss),1) AS worst_cvss,
+                             COUNT(*) AS samples
+                FROM (
+                    SELECT * FROM events ORDER BY id DESC LIMIT 1000
+                ) e
+                GROUP BY repository, ecosystem
+                ORDER BY repository, ecosystem
+                """
+        ).fetchall()
+        con.close()
+        tmpl = templates_env.get_template("trends.html")
+        return tmpl.render(rows=rows)
+
+
 @app.post("/ingest")
 async def ingest(request: Request, authorization: Optional[str] = Header(None)):
     # ELI5: This is a mailbox. The CI sends us a summary. We stamp it with time

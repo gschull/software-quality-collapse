@@ -57,16 +57,20 @@ ELI5: Think of it like sending a scoreboard update. No code leaves your repo, ju
 
 - Run the mini dashboard locally or in Docker:
   ```bash
+  # Option A: Docker Compose (persistent data in ./data)
+  INGEST_TOKEN=your-secret docker compose up -d
+  # Option B: Raw Docker
   docker build -t quality-gate-dashboard -f dashboard/Dockerfile .
-  docker run -p 8000:8000 -e INGEST_TOKEN=your-secret quality-gate-dashboard
+  docker run -p 8000:8000 -e INGEST_TOKEN=your-secret -v %CD%/data:/data quality-gate-dashboard
   # Visit http://localhost:8000
+  # Trends page: http://localhost:8000/trends
   ```
 
 - Enable uploads in your workflow call by adding inputs and a secret token:
   ```yaml
   jobs:
     quality-gate:
-      uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@v0.1.0
+      uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@v0.2.0
       with:
         py_mutation_min: '80'
         py_dep_health_fail: 'true'
