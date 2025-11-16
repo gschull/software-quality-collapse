@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quality Gate Trends</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ddd; padding: 8px; }
+      th { background: #f7f7f7; text-align: left; }
+      tr:nth-child(even) { background: #fafafa; }
+      a { color: #0b57d0; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <h1>Quality Gate Trends</h1>
+    <p>ELI5: This shows the average test strength and worst dependency risk per project and language, based on recent pull requests.</p>
+    <p><a href="/">Back to latest events</a></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Repository</th>
+          <th>Ecosystem</th>
+          <th>Avg Mutation</th>
+          <th>Worst CVSS</th>
+          <th>Samples</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r["repository"] }}</td>
+          <td>{{ r["ecosystem"] }}</td>
+          <td>{{ '%.2f'|format(r["avg_mutation"] or 0) }}%</td>
+          <td>{{ '%.1f'|format(r["worst_cvss"] or 0) }}</td>
+          <td>{{ r["samples"] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+  </html>
