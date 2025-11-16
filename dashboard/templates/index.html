@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quality Gate Dashboard</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ddd; padding: 8px; }
+      th { background: #f7f7f7; text-align: left; }
+      tr:nth-child(even) { background: #fafafa; }
+      .mut-good { color: #137333; font-weight: 600; }
+      .mut-warn { color: #b06000; font-weight: 600; }
+      .mut-bad { color: #a50e0e; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <h1>Quality Gate Dashboard</h1>
+    <p>ELI5: This page shows recent pull requests and how strong their tests are (mutation score) and how risky their dependencies are (CVSS).</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Repository</th>
+          <th>PR</th>
+          <th>Commit</th>
+          <th>Ecosystem</th>
+          <th>Mutation Score</th>
+          <th>Vulns C/H/M/L</th>
+          <th>Max CVSS</th>
+          <th>Run</th>
+          <th>When</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r["repository"] }}</td>
+          <td>#{{ r["pr_number"] }}</td>
+          <td style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;">{{ (r["commit_sha"] or '')[:7] }}</td>
+          <td>{{ r["ecosystem"] }}</td>
+          {% set score = (r["mutation_score"] or 0) %}
+          <td class="{{ 'mut-good' if score >= 90 else ('mut-warn' if score >= 80 else 'mut-bad') }}">{{ '%.2f'|format(score) }}%</td>
+          <td>C:{{ r["dep_critical"] }} H:{{ r["dep_high"] }} M:{{ r["dep_moderate"] }} L:{{ r["dep_low"] }}</td>
+          <td>{{ '%.1f'|format(r["max_cvss"] or 0) }}</td>
+          <td>{{ r["run_id"] }}</td>
+          <td>{{ r["created_at"] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+  </html>
