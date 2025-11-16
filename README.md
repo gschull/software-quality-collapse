@@ -27,6 +27,22 @@ See the composite action in the parent project, or copy the sample workflow in `
 - Java mutation threshold: set `JAVA_MUTATION_MIN` in the workflow (default 90)
 - Java dep health sensitivity: set `JAVA_DEP_HEALTH_FAIL_CVSS` (default 0.1 = fail on any known vuln)
 
+## Reusable Workflow (with inputs)
+You can call the reusable workflow and override thresholds without editing jobs:
+
+```yaml
+name: Quality Gate
+on: pull_request
+jobs:
+  quality-gate:
+    uses: gschull/software-quality-collapse/.github/workflows/quality-gate-reusable.yml@main
+    with:
+      py_mutation_min: '90'         # Python mutmut minimum %
+      py_dep_health_fail: 'true'    # pip-audit --strict
+      java_mutation_min: '90'       # Java PIT minimum %
+      java_cvss_threshold: '0.1'    # Fail on CVSS >= 0.1
+```
+
 ## Why it matters
 - Stronger tests catch real bugs (not just higher coverage numbers)
 - Performance budgets prevent slowdowns from sneaking into PRs
