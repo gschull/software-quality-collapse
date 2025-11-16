@@ -1,0 +1,217 @@
+name: Quality Gate (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      py_mutation_min:
+        description: Minimum Python mutation score (%)
+        required: false
+        type: string
+        default: '90'
+      py_dep_health_fail:
+        description: Fail Python job on any vulnerability (pip-audit --strict)
+        required: false
+        type: string
+        default: 'true'
+      java_mutation_min:
+        description: Minimum Java mutation score (%) for PIT
+        required: false
+        type: string
+        default: '90'
+      java_cvss_threshold:
+        description: OWASP Dependency-Check fail threshold (CVSS)
+        required: false
+        type: string
+        default: '0.1'
+
+jobs:
+  node:
+    name: Node Quality Gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: poc/node-quality-gate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache Node dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            poc/node-quality-gate/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('poc/node-quality-gate/package-lock.json', 'poc/node-quality-gate/npm-shrinkwrap.json', 'poc/node-quality-gate/pnpm-lock.yaml', 'poc/node-quality-gate/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Quality Gate
+        run: npm run quality:ci
+
+  python:
+    name: Python Quality Gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: poc/python-quality-gate
+    env:
+      PY_MUTATION_MIN: ${{ inputs.py_mutation_min }}
+      PY_DEP_HEALTH_FAIL: ${{ inputs.py_dep_health_fail }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('poc/python-quality-gate/requirements.txt', 'poc/python-quality-gate/pyproject.toml', 'poc/python-quality-gate/poetry.lock', 'poc/python-quality-gate/requirements-*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          if [ -f "pyproject.toml" ]; then pip install -e .; fi
+          pip install pytest mutmut
+
+      - name: Dependency health (pip-audit)
+        if: env.PY_DEP_HEALTH_FAIL == 'true'
+        run: |
+          python -m pip install --upgrade pip-audit
+          # --strict fails on any known vulnerability
+          pip-audit --strict
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Run mutation tests (mutmut)
+        run: mutmut run --use-coverage || true
+
+      - name: Enforce mutation threshold (mutmut)
+        run: |
+          python - <<'PY'
+          import os, sqlite3, sys
+          # ELI5: We open mutmut's hidden database to count how many mutations were killed
+          # and calculate a score. If the score is below the required number, we fail.
+          threshold = float(os.environ.get('PY_MUTATION_MIN', '90'))
+          db_path = '.mutmut-cache'
+          try:
+            con = sqlite3.connect(db_path)
+          except Exception as e:
+            print(f"Could not open mutmut cache '{db_path}': {e}")
+            sys.exit(1)
+          cur = con.cursor()
+          # Status values commonly used by mutmut
+          counts = {s: 0 for s in ('killed','survived','timeout','suspicious','incompetent','skipped')}
+          try:
+            for status, cnt in cur.execute("SELECT status, COUNT(*) FROM results GROUP BY status"):
+              counts[status] = cnt
+          except Exception as e:
+            print(f"Failed reading results from mutmut cache: {e}")
+            sys.exit(1)
+          finally:
+            con.close()
+          killed = counts['killed']
+          survived = counts['survived']
+          timeout = counts['timeout']
+          considered = killed + survived + timeout
+          score = 100.0 if considered == 0 else (killed / considered) * 100.0
+          print(f"Mutation score: {score:.2f}% (killed={killed}, survived={survived}, timeout={timeout})")
+          if score + 1e-9 < threshold:
+            print(f"FAIL: mutation score {score:.2f}% is below threshold {threshold:.2f}%")
+            sys.exit(2)
+          print("PASS: mutation score meets threshold")
+          PY
+
+  java:
+    name: Java Quality Gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: poc/java-quality-gate
+    env:
+      JAVA_MUTATION_MIN: ${{ inputs.java_mutation_min }}
+      JAVA_DEP_HEALTH_FAIL_CVSS: ${{ inputs.java_cvss_threshold }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('poc/java-quality-gate/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Set PIT mutation threshold in pom.xml
+        run: |
+          python - <<'PY'
+          import os, sys
+          import xml.etree.ElementTree as ET
+          pom = 'pom.xml'
+          threshold = os.environ.get('JAVA_MUTATION_MIN','90')
+          try:
+            tree = ET.parse(pom)
+            root = tree.getroot()
+            # Find mutationThreshold element (namespace-agnostic)
+            found = False
+            for el in root.iter():
+              if el.tag.endswith('mutationThreshold'):
+                el.text = str(int(float(threshold)))
+                found = True
+                break
+            if not found:
+              for plugin in root.iter():
+                if plugin.tag.endswith('plugin'):
+                  arts = [c for c in plugin if c.tag.endswith('artifactId') and (c.text or '').strip() == 'pitest-maven']
+                  if arts:
+                    conf = None
+                    for c in plugin:
+                      if c.tag.endswith('configuration'):
+                        conf = c
+                        break
+                    if conf is None:
+                      conf = ET.SubElement(plugin, 'configuration')
+                    mt = ET.SubElement(conf, 'mutationThreshold')
+                    mt.text = str(int(float(threshold)))
+                    found = True
+                    break
+            tree.write(pom, encoding='utf-8', xml_declaration=True)
+            print(f"Set PIT mutationThreshold to {threshold}")
+          except Exception as e:
+            print(f"Failed to set mutationThreshold: {e}")
+            sys.exit(1)
+          PY
+
+      - name: Dependency health (OWASP Dependency-Check)
+        run: |
+          mvn -q org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=${{ env.JAVA_DEP_HEALTH_FAIL_CVSS }}
+
+      - name: Run tests
+        run: mvn -q -DskipTests=false test
+
+      - name: Run PIT mutation coverage
+        run: mvn -q org.pitest:pitest-maven:mutationCoverage
