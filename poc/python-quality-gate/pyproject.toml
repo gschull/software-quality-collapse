@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-quality-gate-poc"
+version = "0.1.0"
+description = "POC for Quality Gate++ with pytest + mutmut"
+requires-python = ">=3.10"
+dependencies = [
+    "pytest>=7.0",
+    "coverage>=7.0",
+    "mutmut>=2.4.4"
+]
