@@ -114,7 +114,7 @@ async def ingest(request: Request, authorization: Optional[str] = Header(None)):
 
     con = get_conn()
     try:
-        for eco_key in ("python", "java"):
+        for eco_key in ("python", "java", "node"):
             eco = data.get(eco_key)
             if not eco:
                 continue

@@ -49,7 +49,7 @@ jobs:
 - Dependency health reduces supply chain risk
 
 ## What you’ll see on PRs
-- Auto-summary comment with mutation scores and dependency risk (Python/Java)
+- Auto-summary comment with mutation scores and dependency risk (Node/Python/Java), plus Lighthouse perf for Node
 - Strict but adjustable gates (start at 80% / CVSS 5.0 and raise)
 
 ## Optional: Send Results to a Dashboard
