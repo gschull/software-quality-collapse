@@ -27,6 +27,11 @@ on:
         required: false
         type: string
         default: '0.1'
+      node_dep_fail_level:
+        description: Optional npm audit fail-on severity (low|moderate|high|critical). Empty disables fail.
+        required: false
+        type: string
+        default: ''
       upload_results:
         description: Enable uploading combined metrics to an external endpoint
         required: false
@@ -74,12 +79,35 @@ jobs:
       - name: Run Quality Gate
         run: npm run quality:ci
 
+      - name: Dependency health (npm audit)
+        run: |
+          npm audit --json > npm-audit.json || true
+          # Optional gating by severity level via input
+          if [ -n "${{ inputs.node_dep_fail_level }}" ]; then
+            node -e "
+            const fs=require('fs');
+            const sevOrder={low:1,moderate:2,high:3,critical:4};
+            const want='${{ inputs.node_dep_fail_level }}'.toLowerCase();
+            const data=JSON.parse(fs.readFileSync('npm-audit.json','utf8'));
+            const meta=(data.metadata&&data.metadata.vulnerabilities)||data.vulnerabilities||{};
+            const counts={low:0,moderate:0,high:0,critical:0};
+            for(const k of Object.keys(counts)) counts[k]=Number(meta[k]||0);
+            const shouldFail=Object.entries(counts).some(([k,v])=>sevOrder[k]>=sevOrder[want] && v>0);
+            if(shouldFail){
+              console.error(`npm audit found ${JSON.stringify(counts)} (fail level ${want})`);
+              process.exit(2);
+            } else {
+              console.log('npm audit within allowed thresholds');
+            }
+            "
+          fi
+
       - name: Collect Node metrics (Stryker + Lighthouse)
         run: |
           node -e "
           const fs=require('fs'), path=require('path');
           function readJson(p){ try { return JSON.parse(fs.readFileSync(p,'utf8')); } catch { return null; } }
-          const out={ ecosystem:'node', mutation:{ score:null }, perf:{ score:null } };
+          const out={ ecosystem:'node', mutation:{ score:null }, perf:{ score:null }, dependencies:{critical:0,high:0,moderate:0,low:0,max_cvss:0} };
           // Stryker JSON (if available)
           const mut = readJson('reports/mutation/mutation.json') || readJson('reports/mutation/mutations.json') || readJson('reports/mutation/mutation-report.json');
           if (mut) {
@@ -103,6 +131,15 @@ jobs:
             if (bestScore !== null) {
               out.perf.score = Math.round(bestScore * 100) / 100;
             }
+          }
+          // npm audit JSON (severity counts)
+          const audit = readJson('npm-audit.json');
+          if (audit) {
+            const meta=(audit.metadata&&audit.metadata.vulnerabilities)||audit.vulnerabilities||{};
+            out.dependencies.low = Number(meta.low||0);
+            out.dependencies.moderate = Number(meta.moderate||0);
+            out.dependencies.high = Number(meta.high||0);
+            out.dependencies.critical = Number(meta.critical||0);
           }
           fs.writeFileSync('node_metrics.json', JSON.stringify(out));
           console.log(JSON.stringify(out, null, 2));
