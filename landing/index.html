@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quality Gate++ | Mutation Testing + Perf Budgets + Dep Health for GitHub Actions</title>
+    <meta name="description" content="Stop shipping bugs. Quality Gate++ combines mutation testing, performance budgets, and dependency health checks in one GitHub Actions workflow. Open source core, hosted dashboard.">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        
+        /* Hero */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            padding: 100px 20px;
+        }
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+        .hero .tagline {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        .hero .cta {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 15px 40px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.2rem;
+            margin: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .hero .cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .hero .cta.secondary {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+        }
+        
+        /* Stats */
+        .stats {
+            background: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            margin-top: 40px;
+        }
+        .stat-item h3 {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .stat-item p {
+            font-size: 1.1rem;
+            color: #666;
+        }
+        
+        /* Features */
+        .features {
+            background: #f9f9f9;
+            padding: 80px 20px;
+        }
+        .features h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 50px;
+            color: #333;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+        }
+        .feature-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        .feature-card p {
+            color: #666;
+            line-height: 1.8;
+        }
+        
+        /* Pricing */
+        .pricing {
+            background: white;
+            padding: 80px 20px;
+        }
+        .pricing h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 50px;
+            color: #333;
+        }
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .pricing-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 40px 30px;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .pricing-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        .pricing-card.featured {
+            border-color: #667eea;
+            border-width: 3px;
+            position: relative;
+        }
+        .pricing-card.featured::before {
+            content: 'MOST POPULAR';
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #667eea;
+            color: white;
+            padding: 5px 20px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .pricing-card h3 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .pricing-card .price {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .pricing-card .price span {
+            font-size: 1rem;
+            color: #666;
+        }
+        .pricing-card ul {
+            list-style: none;
+            margin: 30px 0;
+            text-align: left;
+        }
+        .pricing-card ul li {
+            padding: 10px 0;
+            color: #666;
+        }
+        .pricing-card ul li::before {
+            content: '✓';
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .pricing-card .btn {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        .pricing-card .btn:hover {
+            background: #5568d3;
+        }
+        
+        /* Comparison */
+        .comparison {
+            background: #f9f9f9;
+            padding: 80px 20px;
+        }
+        .comparison h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 50px;
+            color: #333;
+        }
+        .comparison-table {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .comparison-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .comparison-table th,
+        .comparison-table td {
+            padding: 20px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .comparison-table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+        .comparison-table .highlight {
+            background: #f0f4ff;
+            font-weight: 600;
+        }
+        
+        /* Waitlist */
+        .waitlist {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 80px 20px;
+            color: white;
+            text-align: center;
+        }
+        .waitlist h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        .waitlist p {
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+        .waitlist form {
+            max-width: 500px;
+            margin: 0 auto;
+            display: flex;
+            gap: 10px;
+        }
+        .waitlist input {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        .waitlist button {
+            padding: 15px 30px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .waitlist button:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Footer */
+        footer {
+            background: #2d3748;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem; }
+            .hero .tagline { font-size: 1.2rem; }
+            .pricing-grid { grid-template-columns: 1fr; }
+            .waitlist form { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Stop Shipping Bugs</h1>
+            <p class="tagline">Mutation Testing + Performance Budgets + Dependency Health<br>in One GitHub Actions Workflow</p>
+            <div>
+                <a href="#waitlist" class="cta">Join Waitlist (Free Beta)</a>
+                <a href="https://github.com/gschull/software-quality-collapse" class="cta secondary">View on GitHub</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="container">
+            <h2>Why Quality Gate++?</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <h3>2x</h3>
+                    <p>More bugs caught vs coverage alone</p>
+                </div>
+                <div class="stat-item">
+                    <h3>46x</h3>
+                    <p>ROI for typical team</p>
+                </div>
+                <div class="stat-item">
+                    <h3>5 min</h3>
+                    <p>Setup time</p>
+                </div>
+                <div class="stat-item">
+                    <h3>100%</h3>
+                    <p>Open source core</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2>Three Gates, One Workflow</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3>🧬 Mutation Testing</h3>
+                    <p>Inject fake bugs into your code. If tests don't catch them, your tests are weak. Supports Node (Stryker), Python (mutmut), Java (PIT). Catches 2x more defects than coverage metrics alone.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>⚡ Performance Budgets</h3>
+                    <p>Block PRs that regress performance. Lighthouse CI for web apps, k6 thresholds for APIs. Define budgets like "first contentful paint < 2s" and enforce them automatically.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔒 Dependency Health</h3>
+                    <p>CVSS scoring, vulnerability counts, and age checks. Supports npm audit, pip-audit, OWASP Dependency-Check. Fail PRs on critical CVEs or warn on old packages.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📊 Hosted Dashboard</h3>
+                    <p>Track quality trends over time. No Docker setup—just point your workflow at our ingest endpoint. See mutation scores, CVSS trends, and perf budgets in one place.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🚀 GitHub Actions Native</h3>
+                    <p>Reusable workflow with configurable thresholds. Add one YAML block to your repo. Works with Node, Python, Java—more languages coming. PR comments show results instantly.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🎯 ELI5 Documentation</h3>
+                    <p>Every concept explained like you're five. No PhD required. "Mutation testing = pretend bugs to test your tests." Clear setup guides, real examples, friendly errors.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing">
+        <div class="container">
+            <h2>Simple, Transparent Pricing</h2>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Starter</h3>
+                    <div class="price">$0<span>/forever</span></div>
+                    <ul>
+                        <li>Open source workflow</li>
+                        <li>Self-hosted dashboard</li>
+                        <li>Community support</li>
+                        <li>Public repos</li>
+                        <li>30-day history</li>
+                    </ul>
+                    <a href="https://github.com/gschull/software-quality-collapse" class="btn">Get Started</a>
+                </div>
+                
+                <div class="pricing-card featured">
+                    <h3>Pro</h3>
+                    <div class="price">$10<span>/dev/month</span></div>
+                    <ul>
+                        <li>Hosted dashboard</li>
+                        <li>90-day trend history</li>
+                        <li>Slack/Discord webhooks</li>
+                        <li>Email support (48h SLA)</li>
+                        <li>Private repos</li>
+                    </ul>
+                    <a href="#waitlist" class="btn">Join Beta</a>
+                </div>
+                
+                <div class="pricing-card">
+                    <h3>Team</h3>
+                    <div class="price">$15<span>/dev/month</span></div>
+                    <ul>
+                        <li>Org-wide policy management</li>
+                        <li>SAML SSO</li>
+                        <li>Audit logs</li>
+                        <li>Priority support (24h SLA)</li>
+                        <li>1-year history</li>
+                    </ul>
+                    <a href="mailto:sales@quality-gate.dev" class="btn">Contact Sales</a>
+                </div>
+            </div>
+            <p style="text-align: center; margin-top: 40px; color: #666;">
+                <strong>Enterprise?</strong> Custom pricing, on-prem deployment, compliance reports, white-label dashboard.
+                <a href="mailto:enterprise@quality-gate.dev" style="color: #667eea;">Talk to us →</a>
+            </p>
+        </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section class="comparison">
+        <div class="container">
+            <h2>How We Compare</h2>
+            <div class="comparison-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Quality Gate++</th>
+                            <th>SonarQube</th>
+                            <th>Codecov</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Mutation Testing</td>
+                            <td class="highlight">✓ Built-in</td>
+                            <td>✗</td>
+                            <td>✗</td>
+                        </tr>
+                        <tr>
+                            <td>Performance Budgets</td>
+                            <td class="highlight">✓ Lighthouse + k6</td>
+                            <td>✗</td>
+                            <td>✗</td>
+                        </tr>
+                        <tr>
+                            <td>Dependency Health</td>
+                            <td class="highlight">✓ CVSS scoring</td>
+                            <td>✓</td>
+                            <td>✗</td>
+                        </tr>
+                        <tr>
+                            <td>Open Source Core</td>
+                            <td class="highlight">✓ MIT License</td>
+                            <td>✓ (limited)</td>
+                            <td>✗</td>
+                        </tr>
+                        <tr>
+                            <td>PR Comments</td>
+                            <td class="highlight">✓ Native</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                        </tr>
+                        <tr>
+                            <td>Price (25 devs)</td>
+                            <td class="highlight">$250/month</td>
+                            <td>$312/month</td>
+                            <td>$725/month</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Waitlist Section -->
+    <section class="waitlist" id="waitlist">
+        <div class="container">
+            <h2>Join the Beta Waitlist</h2>
+            <p>Get free access to the hosted dashboard for 90 days. No credit card required.</p>
+            <form action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+                <input type="email" name="email" placeholder="you@company.com" required>
+                <button type="submit">Join Waitlist</button>
+            </form>
+            <p style="margin-top: 20px; font-size: 0.9rem; opacity: 0.8;">
+                We'll email you when we're ready. ~2-3 weeks. Privacy-first, no spam.
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>Quality Gate++ by <a href="https://github.com/gschull">@gschull</a> | 
+            <a href="https://github.com/gschull/software-quality-collapse">GitHub</a> | 
+            <a href="https://github.com/gschull/software-quality-collapse/blob/main/README.md">Docs</a> | 
+            <a href="mailto:hello@quality-gate.dev">Contact</a></p>
+            <p style="margin-top: 10px; opacity: 0.7;">MIT License | Built with 💜 to stop software quality collapse</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

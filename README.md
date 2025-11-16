@@ -52,6 +52,16 @@ jobs:
 - Auto-summary comment with mutation scores and dependency risk (Node/Python/Java), plus Lighthouse perf for Node
 - Strict but adjustable gates (start at 80% / CVSS 5.0 and raise)
 
+## Optional: Telemetry (Help Us Improve)
+Enable anonymous usage stats to help prioritize features. **Opt-in only, no PII collected.**
+
+```yaml
+with:
+  telemetry_enabled: 'true'  # Optional: send ecosystem + avg scores
+```
+
+See [TELEMETRY.md](TELEMETRY.md) for what's collected and privacy details.
+
 ## Optional: Send Results to a Dashboard
 ELI5: Think of it like sending a scoreboard update. No code leaves your repo, just the scores.
 
@@ -84,6 +94,20 @@ ELI5: Think of it like sending a scoreboard update. No code leaves your repo, ju
   ```
 
 Data sent: repo, PR number, commit SHA, mutation scores (Python/Java), vulnerability counts, max CVSS.
+
+## Hosted Dashboard (Coming Soon)
+
+🚀 **Tired of self-hosting Docker?** Join the waitlist for our hosted dashboard:
+
+**[quality-gate.dev](landing/index.html)** - Free 90-day beta, then $10/dev/month
+
+**What you get:**
+- No Docker/Fly.io setup: just point your workflow at our ingest endpoint
+- 90-day trend history with Chart.js visualizations
+- Slack/Discord webhooks for daily digests
+- Email support (48-hour SLA)
+
+See [MONETIZATION.md](MONETIZATION.md) for full pricing (Pro/Team/Enterprise tiers).
 
 ## Org-wide Rollout Script
 Use the helper script to open PRs across many repos (requires GitHub CLI):
