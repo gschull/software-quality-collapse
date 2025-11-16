@@ -1,5 +1,7 @@
 # Software Quality Collapse – Quality Gate++
 
+[![Quality Gate](https://github.com/gschull/software-quality-collapse/actions/workflows/quality-gate.yml/badge.svg?branch=main)](https://github.com/gschull/software-quality-collapse/actions/workflows/quality-gate.yml)
+
 🎯 ELI5: This repo is like a robot inspector that checks your code before it goes live. It tries to break your tests (mutation testing), measures website speed (performance budgets), and checks your libraries for safety (dependency health).
 
 ## What's here
