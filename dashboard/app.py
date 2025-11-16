@@ -44,26 +44,26 @@ def init_db():
             max_cvss REAL,
             run_id INTEGER,
             created_at TEXT NOT NULL
-            con.execute(
-                """
-                CREATE TABLE IF NOT EXISTS customers (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email TEXT NOT NULL UNIQUE,
-                    stripe_customer_id TEXT UNIQUE,
-                    stripe_subscription_id TEXT UNIQUE,
-                    plan TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    canceled_at TEXT,
-                    metadata TEXT
-                )
-                """
-            )
-            con.execute("CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)")
-            con.execute("CREATE INDEX IF NOT EXISTS idx_customers_stripe_customer_id ON customers(stripe_customer_id)")
         )
         """
     )
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            stripe_customer_id TEXT UNIQUE,
+            stripe_subscription_id TEXT UNIQUE,
+            plan TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            canceled_at TEXT,
+            metadata TEXT
+        )
+        """
+    )
+    con.execute("CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_customers_stripe_customer_id ON customers(stripe_customer_id)")
     con.commit()
     con.close()
 
@@ -112,8 +112,8 @@ async def trends():
         return tmpl.render(rows=rows)
 
 
-    @app.get("/api/series")
-    async def api_series(limit: int = 1000):
+@app.get("/api/series")
+async def api_series(limit: int = 1000):
         con = get_conn()
         # Aggregate by date for average mutation and max CVSS per ecosystem
         q = (
