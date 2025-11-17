@@ -32,7 +32,7 @@ def test_db():
 def client(test_db):
     """Create a test client with a fresh database."""
     # Import after environment is set
-    from dashboard.app import app, init_db
+    from app import app, init_db
     init_db()
     return TestClient(app)
 
