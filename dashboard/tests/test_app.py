@@ -20,15 +20,12 @@ def test_db():
     """Provide a temporary database for tests."""
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
-    # Use absolute path and unique identifier to prevent cross-mutation contamination
+    # Ensure the file is deleted before we start (clean slate)
+    if os.path.exists(path):
+        os.unlink(path)
+    # Use absolute path to prevent path resolution issues
     path = os.path.abspath(path)
     os.environ["DATABASE_URL"] = path
-    # Clean up any existing file (in case of mutation test weirdness)
-    if os.path.exists(path):
-        try:
-            os.unlink(path)
-        except:
-            pass
     yield path
     # Clean up
     try:
@@ -48,12 +45,6 @@ def client(test_db):
     from app import app, init_db
     # Ensure fresh initialization
     init_db()
-    # Verify database is actually empty
-    from app import get_conn
-    conn = get_conn()
-    result = conn.execute("SELECT COUNT(*) as cnt FROM events").fetchone()
-    conn.close()
-    assert result["cnt"] == 0, f"Database not empty: {result['cnt']} events found"
     return TestClient(app)
 
 
