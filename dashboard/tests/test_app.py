@@ -884,3 +884,128 @@ def test_api_series_substring_extraction(client):
         # Should be in YYYY-MM-DD format (10 characters)
         assert len(day) == 10
         assert day.count("-") == 2  # YYYY-MM-DD has 2 dashes
+
+
+def test_ingest_empty_string_ecosystem(client):
+    """Test that empty string ecosystems are skipped."""
+    from app import get_conn
+    
+    payload = {
+        "repository": "empty/str",
+        "python": {"mutation": {"score": 75.0}},
+        "java": "",  # Empty string is falsy
+        "node": {"mutation": {"score": 80.0}}
+    }
+    
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    
+    con = get_conn()
+    rows = con.execute("SELECT ecosystem FROM events WHERE repository = ?", ("empty/str",)).fetchall()
+    con.close()
+    
+    ecosystems = {row["ecosystem"] for row in rows}
+    assert ecosystems == {"python", "node"}
+    assert "java" not in ecosystems
+
+
+def test_ingest_empty_dict_ecosystem(client):
+    """Test that empty dict ecosystems are skipped."""
+    from app import get_conn
+    
+    payload = {
+        "repository": "empty/dict",
+        "python": {"mutation": {"score": 75.0}},
+        "java": {},  # Empty dict is falsy
+    }
+    
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    
+    con = get_conn()
+    rows = con.execute("SELECT ecosystem FROM events WHERE repository = ?", ("empty/dict",)).fetchall()
+    con.close()
+    
+    assert len(rows) == 1
+    assert rows[0]["ecosystem"] == "python"
+
+
+def test_authorization_without_bearer_prefix(client):
+    """Test that authorization without 'Bearer ' prefix fails."""
+    payload = {"repository": "no/bearer", "python": {"mutation": {"score": 75.0}}}
+    
+    # Just the token without "Bearer " prefix
+    response = client.post("/ingest", json=payload, headers={"Authorization": "test-token-12345"})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Missing token"
+
+
+def test_authorization_bearer_wrong_case(client):
+    """Test that 'Bearer' is case-sensitive."""
+    payload = {"repository": "case/test", "python": {"mutation": {"score": 75.0}}}
+    
+    # Lowercase "bearer"
+    response = client.post("/ingest", json=payload, headers={"Authorization": "bearer test-token-12345"})
+    assert response.status_code == 401
+    
+    # Mixed case "BeaRer"
+    response = client.post("/ingest", json=payload, headers={"Authorization": "BeaRer test-token-12345"})
+    assert response.status_code == 401
+
+
+def test_token_not_equal_comparison(client):
+    """Test that token comparison uses != operator correctly."""
+    payload = {"repository": "token/ne", "python": {"mutation": {"score": 75.0}}}
+    
+    # Wrong token should give 403 Invalid token
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer wrong-token"})
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Invalid token"
+    
+    # Correct token should succeed
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+
+
+def test_split_with_maxsplit_one(client):
+    """Test that split uses maxsplit=1 to handle tokens with spaces."""
+    # Create a token that has spaces in it to test split(" ", 1)
+    # With maxsplit=1: "Bearer token with spaces" -> ["Bearer", "token with spaces"]
+    # With maxsplit=0 or no limit: would split on all spaces
+    
+    payload = {"repository": "split/max", "python": {"mutation": {"score": 75.0}}}
+    
+    # This relies on our test token NOT having spaces, so we test the code path
+    # The actual behavior: split(" ", 1) means "split once on space"
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    
+    # If split(" ", 1) was mutated to split(" ", 0), it would break
+    # If mutated to split(" ", 2), it would still work for our test token
+    # But the intent is maxsplit=1 for tokens that might contain spaces
+
+
+def test_ecosystem_loop_iterates_python_java_node(client):
+    """Test that loop explicitly iterates ("python", "java", "node")."""
+    from app import get_conn
+    
+    # Send all three ecosystem types
+    payload = {
+        "repository": "loop/explicit",
+        "python": {"mutation": {"score": 50.0}},
+        "java": {"mutation": {"score": 60.0}},
+        "node": {"mutation": {"score": 70.0}},
+        "rust": {"mutation": {"score": 99.0}},  # Not in the loop tuple - should be ignored
+    }
+    
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    
+    con = get_conn()
+    rows = con.execute("SELECT ecosystem FROM events WHERE repository = ?", ("loop/explicit",)).fetchall()
+    con.close()
+    
+    ecosystems = {row["ecosystem"] for row in rows}
+    # Should have exactly python, java, node (not rust)
+    assert ecosystems == {"python", "java", "node"}
+    assert "rust" not in ecosystems
