@@ -5,7 +5,7 @@ app = "quality-gate-dashboard-gschull"
 
 [env]
   INGEST_TOKEN = "change-me"
-  DATABASE_URL = "/data/metrics.db"
+  DATABASE_URL = "/app/metrics.db"
 
 [http_service]
   internal_port = 8080
