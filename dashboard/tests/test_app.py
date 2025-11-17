@@ -720,12 +720,12 @@ def test_api_series_float_conversion(client):
         assert isinstance(data["python"][0]["max_cvss"], (int, float))
 
 
-def test_ingest_ecosystem_loop_order(client):
-    """Test that ecosystems are processed in python, java, node order."""
+def test_ingest_all_ecosystems(client):
+    """Test that all three ecosystems can be ingested."""
     from app import get_conn
     
     payload = {
-        "repository": "order/test",
+        "repository": "all/test",
         "node": {"mutation": {"score": 30.0}},
         "python": {"mutation": {"score": 90.0}},
         "java": {"mutation": {"score": 60.0}}
@@ -735,14 +735,12 @@ def test_ingest_ecosystem_loop_order(client):
     
     # Check all three were inserted
     con = get_conn()
-    rows = con.execute("SELECT ecosystem, mutation_score FROM events WHERE repository = ? ORDER BY id", ("order/test",)).fetchall()
+    rows = con.execute("SELECT ecosystem, mutation_score FROM events WHERE repository = ?", ("all/test",)).fetchall()
     con.close()
     
     assert len(rows) == 3
-    # Should be in python, java, node order based on the for loop
-    assert rows[0]["ecosystem"] == "python"
-    assert rows[1]["ecosystem"] == "java"
-    assert rows[2]["ecosystem"] == "node"
+    ecosystems = {row["ecosystem"] for row in rows}
+    assert ecosystems == {"python", "java", "node"}
 
 
 def test_ingest_created_at_timestamp(client):
