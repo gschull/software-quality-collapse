@@ -147,15 +147,15 @@ jobs:
                           last = ''
                           for i, line in enumerate(lines):
                               if 'mutations/second' in line and i > 0:
-                          # Look backwards for the summary line, skipping warnings and FAILED lines
-                          for j in range(i-1, max(0, i-5), -1):
-                              candidate = lines[j]
-                              # Skip warning/deprecation/test failure lines
-                              if ('Warning' not in candidate and 'DeprecationWarning' not in candidate 
-                                  and 'FAILED' not in candidate and '/' in candidate):
-                                  last = candidate
+                                  # Look backwards for the summary line, skipping warnings and FAILED lines
+                                  for j in range(i-1, max(0, i-5), -1):
+                                      candidate = lines[j]
+                                      # Skip warning/deprecation/test failure lines
+                                      if ('Warning' not in candidate and 'DeprecationWarning' not in candidate 
+                                          and 'FAILED' not in candidate and '/' in candidate):
+                                          last = candidate
+                                          break
                                   break
-                          break
                   
                   if not last:
                       # Fallback: find line matching pattern like "255/255" with multiple counters
@@ -163,28 +163,30 @@ jobs:
                       candidates = [l for l in lines if '/' in l and l.count(' ') > 5 
                                   and 'Warning' not in l and 'DeprecationWarning' not in l
                                   and 'FAILED' not in l and 'passed' not in l]
-                      last = candidates[-1] if candidates else ''                          print(f"mutmut_run.log last summary line: {last[:200]}")
-                          # Extract all numbers (including from fractions like "255/255")
-                          nums = [int(n) for n in re.findall(r'\d+', last)]
-                          print(f"Extracted numbers from summary: {nums}")
-                          # Typical pattern: [255, 255, killed, skipped, 0, 0, survived, 0]
-                          # Where killed=92, survived=126 (the two largest non-zero numbers)
-                          if len(nums) >= 4:
-                              # First two are the fraction (255/255), skip them
-                              counters = nums[2:] if len(nums) > 2 else nums
-                              # killed is usually first counter, survived is the largest
-                              killed = counters[0] if len(counters) > 0 else 0
-                              survived = max((n for n in counters if n > 10), default=0)  # survived is typically large
-                              timeout = 0  # usually 0 in output
-                              considered = killed + survived + timeout
-                              if considered > 0:
-                                  print(f"Parsed from mutmut_run.log: killed={killed}, survived={survived}, timeout={timeout}")
-                                  source = "cli-log"
-                          if considered == 0 and last:
-                              print(f"Failed to parse counts from summary line")
+                      last = candidates[-1] if candidates else ''
+                  
+                  print(f"mutmut_run.log last summary line: {last[:200]}")
+                  # Extract all numbers (including from fractions like "255/255")
+                  nums = [int(n) for n in re.findall(r'\d+', last)]
+                  print(f"Extracted numbers from summary: {nums}")
+                  # Typical pattern: [255, 255, killed, skipped, 0, 0, survived, 0]
+                  # Where killed=92, survived=126 (the two largest non-zero numbers)
+                  if len(nums) >= 4:
+                      # First two are the fraction (255/255), skip them
+                      counters = nums[2:] if len(nums) > 2 else nums
+                      # killed is usually first counter, survived is the largest
+                      killed = counters[0] if len(counters) > 0 else 0
+                      survived = max((n for n in counters if n > 10), default=0)  # survived is typically large
+                      timeout = 0  # usually 0 in output
+                      considered = killed + survived + timeout
+                      if considered > 0:
+                          print(f"Parsed from mutmut_run.log: killed={killed}, survived={survived}, timeout={timeout}")
+                          source = "cli-log"
+                  if considered == 0 and last:
+                      print(f"Failed to parse counts from summary line")
 
-                      # 2) If still nothing, fall back to mutmut results listing (survivors-only)
-                      if considered == 0:
+                  # 2) If still nothing, fall back to mutmut results listing (survivors-only)
+                  if considered == 0:
                           help_proc = subprocess.run(['mutmut','results','--help'], capture_output=True, text=True, check=False)
                           help_out = (help_proc.stdout or '') + '\n' + (help_proc.stderr or '')
                           has_show_killed = '--show-killed' in help_out
