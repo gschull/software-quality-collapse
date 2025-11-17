@@ -1195,3 +1195,31 @@ def test_roi_team_size_le_validator(client):
     # Try with 10000 (should succeed)
     response = client.get("/api/roi?team_size=10000&plan=pro")
     assert response.status_code == 200
+
+
+def test_roi_plan_default_is_pro(client):
+    """Test that plan has default value of 'pro'."""
+    # Call without plan parameter
+    response = client.get("/api/roi?team_size=10")
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Should use default "pro"
+    assert data["inputs"]["plan"] == "pro"
+    
+    # Cost should use pro pricing ($10/dev)
+    assert data["costs"]["per_month"] == 100
+
+
+def test_roi_plan_regex_validation(client):
+    """Test that plan must match regex pattern."""
+    # Try with invalid plan
+    response = client.get("/api/roi?team_size=10&plan=invalid")
+    assert response.status_code == 422  # Validation error
+    
+    # Try with each valid plan
+    for plan in ["pro", "team", "enterprise"]:
+        response = client.get(f"/api/roi?team_size=10&plan={plan}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["inputs"]["plan"] == plan
