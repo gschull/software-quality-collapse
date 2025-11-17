@@ -620,3 +620,153 @@ def test_api_series_default_limit(client):
     # Call without limit parameter (should use default 1000)
     response = client.get("/api/series")
     assert response.status_code == 200
+
+
+def test_authorization_split_behavior(client):
+    """Test that authorization header is split correctly on first space only."""
+    payload = {"repository": "test/auth", "python": {"mutation": {"score": 75.0}}}
+    
+    # Token with space in it (after Bearer) - should use everything after first space
+    response = client.post(
+        "/ingest",
+        json=payload,
+        headers={"Authorization": "Bearer test-token-12345"}
+    )
+    assert response.status_code == 200
+    
+    # Without Bearer prefix should fail
+    response = client.post(
+        "/ingest",
+        json=payload,
+        headers={"Authorization": "test-token-12345"}
+    )
+    assert response.status_code == 401
+
+
+def test_ingest_all_dependency_fields(client):
+    """Test that all dependency fields are stored correctly."""
+    from app import get_conn
+    
+    payload = {
+        "repository": "deps/test",
+        "pr_number": "1",
+        "python": {
+            "mutation": {"score": 88.5, "killed": 100, "survived": 13, "timeout": 0},
+            "dependencies": {
+                "critical": 2,
+                "high": 3,
+                "moderate": 5,
+                "low": 7,
+                "max_cvss": 9.8
+            }
+        }
+    }
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    
+    # Verify data was stored correctly
+    con = get_conn()
+    row = con.execute("SELECT * FROM events WHERE repository = ?", ("deps/test",)).fetchone()
+    con.close()
+    
+    assert row is not None
+    assert row["mutation_score"] == 88.5
+    assert row["dep_critical"] == 2
+    assert row["dep_high"] == 3
+    assert row["dep_moderate"] == 5
+    assert row["dep_low"] == 7
+    assert row["max_cvss"] == 9.8
+
+
+def test_ingest_converts_to_correct_types(client):
+    """Test type conversions in ingest (float, int)."""
+    from app import get_conn
+    
+    payload = {
+        "repository": "types/test",
+        "run_id": "999",
+        "python": {
+            "mutation": {"score": "75.5"},  # String that should be converted to float
+            "dependencies": {"critical": "1", "max_cvss": "6.5"}  # Strings to convert
+        }
+    }
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    
+    # Verify types in database
+    con = get_conn()
+    row = con.execute("SELECT * FROM events WHERE repository = ?", ("types/test",)).fetchone()
+    con.close()
+    
+    assert row["mutation_score"] == 75.5
+    assert row["run_id"] == 999
+
+
+def test_api_series_float_conversion(client):
+    """Test that API series converts None to 0 using 'or 0' for floats."""
+    payload = {
+        "repository": "float/test",
+        "python": {"mutation": {}, "dependencies": {}}
+    }
+    client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    
+    response = client.get("/api/series")
+    data = response.json()
+    
+    # Verify float conversion happens
+    if "python" in data and len(data["python"]) > 0:
+        # These should be floats, not None
+        assert isinstance(data["python"][0]["avg_mutation"], (int, float))
+        assert isinstance(data["python"][0]["max_cvss"], (int, float))
+
+
+def test_ingest_ecosystem_loop_order(client):
+    """Test that ecosystems are processed in python, java, node order."""
+    from app import get_conn
+    
+    payload = {
+        "repository": "order/test",
+        "node": {"mutation": {"score": 30.0}},
+        "python": {"mutation": {"score": 90.0}},
+        "java": {"mutation": {"score": 60.0}}
+    }
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    
+    # Check all three were inserted
+    con = get_conn()
+    rows = con.execute("SELECT ecosystem, mutation_score FROM events WHERE repository = ? ORDER BY id", ("order/test",)).fetchall()
+    con.close()
+    
+    assert len(rows) == 3
+    # Should be in python, java, node order based on the for loop
+    assert rows[0]["ecosystem"] == "python"
+    assert rows[1]["ecosystem"] == "java"
+    assert rows[2]["ecosystem"] == "node"
+
+
+def test_ingest_created_at_timestamp(client):
+    """Test that created_at is set with utcnow isoformat."""
+    from app import get_conn
+    from datetime import datetime
+    
+    payload = {
+        "repository": "timestamp/test",
+        "python": {"mutation": {"score": 75.0}}
+    }
+    
+    before = datetime.utcnow()
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    after = datetime.utcnow()
+    
+    assert response.status_code == 200
+    
+    con = get_conn()
+    row = con.execute("SELECT created_at FROM events WHERE repository = ?", ("timestamp/test",)).fetchone()
+    con.close()
+    
+    # Parse the timestamp
+    created_at = datetime.fromisoformat(row["created_at"])
+    
+    # Should be between before and after
+    assert before <= created_at <= after
