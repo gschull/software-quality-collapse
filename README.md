@@ -5,10 +5,10 @@
 🎯 ELI5: This repo is like a robot inspector that checks your code before it goes live. It tries to break your tests (mutation testing), measures website speed (performance budgets), and checks your libraries for safety (dependency health).
 
 ## 📚 Documentation
-
-- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - 5-minute setup guide with quick reference
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment, configuration, and troubleshooting guide
-- **[Live Dashboard](https://quality-gate-dashboard-gschull.fly.dev/)** - View metrics trends
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - 5-minute setup guide with quick reference  
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment, configuration, and troubleshooting guide  
+- **[EXTERNAL_REPO_SETUP.md](EXTERNAL_REPO_SETUP.md)** - Setting up quality gates on external repositories  
+- **[Live Dashboard](https://quality-gate-dashboard-gschull.fly.dev/)** - View metrics trends  
 - **[Landing Page](https://gschull.github.io/software-quality-collapse/)** - Project overview
 
 ## What's here
