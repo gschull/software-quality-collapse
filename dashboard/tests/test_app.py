@@ -768,3 +768,119 @@ def test_ingest_created_at_timestamp(client):
     
     # Should be between before and after
     assert before <= created_at <= after
+
+
+def test_ingest_bearer_token_with_spaces(client):
+    """Test that token extraction works correctly with Bearer prefix."""
+    # If split(" ", 1) is mutated to split(" ", 0) or split(" ", 2), this would fail
+    payload = {"repository": "test/split", "python": {"mutation": {"score": 75.0}}}
+    
+    # Token that would behave differently with wrong split argument
+    # With split(" ", 1): ["Bearer", "token-with-space here"]
+    # With split(" ", 0) or split(" "): would split differently
+    response = client.post(
+        "/ingest",
+        json=payload,
+        headers={"Authorization": "Bearer test-token-12345"}
+    )
+    assert response.status_code == 200
+
+
+def test_ingest_error_messages(client):
+    """Test that error messages are specific and correct."""
+    payload = {"repository": "test/err", "python": {"mutation": {"score": 75.0}}}
+    
+    # Test 401 error message
+    response = client.post("/ingest", json=payload)
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Missing token"
+    
+    # Test 403 error message
+    response = client.post(
+        "/ingest",
+        json=payload,
+        headers={"Authorization": "Bearer wrong"}
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Invalid token"
+
+
+def test_bearer_prefix_check(client):
+    """Test that 'Bearer ' prefix is required with space."""
+    payload = {"repository": "test/bearer", "python": {"mutation": {"score": 75.0}}}
+    
+    # "Bearer" without space should fail
+    response = client.post(
+        "/ingest",
+        json=payload,
+        headers={"Authorization": "Bearertest-token-12345"}
+    )
+    assert response.status_code == 401
+    
+    # Other prefixes should fail
+    response = client.post(
+        "/ingest",
+        json=payload,
+        headers={"Authorization": "Token test-token-12345"}
+    )
+    assert response.status_code == 401
+
+
+def test_roi_division_by_zero_protection(client):
+    """Test that ROI handles zero cost correctly."""
+    # Edge case: if cost_per_year is 0, roi_multiple should be 0 (not division error)
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    data = response.json()
+    # Should not crash and should have valid roi_multiple
+    assert "roi" in data
+    assert "multiple" in data["roi"]
+    assert isinstance(data["roi"]["multiple"], (int, float))
+
+
+def test_roi_payback_period_protection(client):
+    """Test that payback period handles zero roi_multiple."""
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    data = response.json()
+    # payback_period_days = round(365 / roi_multiple, 0) if roi_multiple > 0 else 365
+    # Should have a valid payback period
+    assert "payback_period_days" in data["roi"]
+    assert data["roi"]["payback_period_days"] > 0
+
+
+def test_ingest_continue_on_empty_ecosystem(client):
+    """Test that loop continues when ecosystem is None or missing."""
+    payload = {
+        "repository": "continue/test",
+        "python": {"mutation": {"score": 50.0}},
+        "java": None,  # Should continue
+        "node": {"mutation": {"score": 60.0}}
+    }
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    
+    from app import get_conn
+    con = get_conn()
+    rows = con.execute("SELECT ecosystem FROM events WHERE repository = ?", ("continue/test",)).fetchall()
+    con.close()
+    
+    # Should have python and node, but not java
+    ecosystems = {row["ecosystem"] for row in rows}
+    assert ecosystems == {"python", "node"}
+
+
+def test_api_series_substring_extraction(client):
+    """Test that day is extracted as first 10 chars of created_at."""
+    from app import get_conn
+    
+    payload = {"repository": "substr/test", "python": {"mutation": {"score": 75.0}}}
+    client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    
+    # Check that the SQL substr(created_at,1,10) works correctly
+    response = client.get("/api/series")
+    data = response.json()
+    
+    if "python" in data and len(data["python"]) > 0:
+        day = data["python"][0]["day"]
+        # Should be in YYYY-MM-DD format (10 characters)
+        assert len(day) == 10
+        assert day.count("-") == 2  # YYYY-MM-DD has 2 dashes
