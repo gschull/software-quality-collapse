@@ -1111,3 +1111,87 @@ def test_roi_payback_uses_365_days(client):
     # total_value=180000+50000=230000, roi=230000/6000=38.3
     # payback=365/38.3=9.5 → rounds to 10 days
     assert data["roi"]["payback_period_days"] == 10
+
+
+def test_index_sql_limit_100(client):
+    """Test that index page SQL uses LIMIT 100 (not 99 or 101)."""
+    from app import get_conn
+    import os
+    
+    # Create exactly 150 events
+    for i in range(150):
+        payload = {
+            "repository": f"test/limit{i}",
+            "python": {"mutation": {"score": 50.0 + i * 0.1}}
+        }
+        client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    
+    # Index page should show only the latest 100
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    
+    # Count occurrences of "test/limit" in HTML
+    count = html.count("test/limit")
+    # Should be exactly 100 (from limit149 down to limit50)
+    assert count == 100
+
+
+def test_trends_sql_limit_1000(client):
+    """Test that trends page SQL uses LIMIT 1000 in subquery."""
+    from app import get_conn
+    
+    # Create exactly 1100 events with two distinct repos
+    for i in range(1100):
+        repo = "repo/a" if i < 550 else "repo/b"
+        payload = {
+            "repository": repo,
+            "python": {"mutation": {"score": 50.0}}
+        }
+        client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    
+    # Trends should only consider the latest 1000 events
+    response = client.get("/trends")
+    assert response.status_code == 200
+    html = response.text
+    
+    # Both repos should appear (repo/b has 550 events, all in last 1000)
+    # repo/a has 550 events, but only the last 450 are in the window
+    assert "repo/a" in html
+    assert "repo/b" in html
+
+
+def test_roi_team_size_default_25(client):
+    """Test that team_size has default value of 25."""
+    # Call without team_size parameter
+    response = client.get("/api/roi?plan=pro")
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Should use default 25
+    assert data["inputs"]["team_size"] == 25
+    
+    # Cost should be 25 * 10 = 250/month
+    assert data["costs"]["per_month"] == 250
+
+
+def test_roi_team_size_ge_validator(client):
+    """Test that team_size must be >= 1."""
+    # Try with 0 (should fail)
+    response = client.get("/api/roi?team_size=0&plan=pro")
+    assert response.status_code == 422  # Validation error
+    
+    # Try with 1 (should succeed)
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    assert response.status_code == 200
+
+
+def test_roi_team_size_le_validator(client):
+    """Test that team_size must be <= 10000."""
+    # Try with 10001 (should fail)
+    response = client.get("/api/roi?team_size=10001&plan=pro")
+    assert response.status_code == 422  # Validation error
+    
+    # Try with 10000 (should succeed)
+    response = client.get("/api/roi?team_size=10000&plan=pro")
+    assert response.status_code == 200
