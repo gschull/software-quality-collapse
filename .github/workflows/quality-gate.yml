@@ -147,23 +147,23 @@ jobs:
                           last = ''
                           for i, line in enumerate(lines):
                               if 'mutations/second' in line and i > 0:
-                                  # Look backwards for the summary line, skipping warnings
-                                  for j in range(i-1, max(0, i-5), -1):
-                                      candidate = lines[j]
-                                      # Skip warning/deprecation lines
-                                      if 'Warning' not in candidate and 'DeprecationWarning' not in candidate and '/' in candidate:
-                                          last = candidate
-                                          break
+                          # Look backwards for the summary line, skipping warnings and FAILED lines
+                          for j in range(i-1, max(0, i-5), -1):
+                              candidate = lines[j]
+                              # Skip warning/deprecation/test failure lines
+                              if ('Warning' not in candidate and 'DeprecationWarning' not in candidate 
+                                  and 'FAILED' not in candidate and '/' in candidate):
+                                  last = candidate
                                   break
-                          
-                          if not last:
-                              # Fallback: find line matching pattern like "255/255" with multiple counters
-                              # Skip lines with warnings
-                              candidates = [l for l in lines if '/' in l and l.count(' ') > 5 
-                                          and 'Warning' not in l and 'DeprecationWarning' not in l]
-                              last = candidates[-1] if candidates else ''
-                          
-                          print(f"mutmut_run.log last summary line: {last[:200]}")
+                          break
+                  
+                  if not last:
+                      # Fallback: find line matching pattern like "255/255" with multiple counters
+                      # Skip lines with warnings and test failures
+                      candidates = [l for l in lines if '/' in l and l.count(' ') > 5 
+                                  and 'Warning' not in l and 'DeprecationWarning' not in l
+                                  and 'FAILED' not in l and 'passed' not in l]
+                      last = candidates[-1] if candidates else ''                          print(f"mutmut_run.log last summary line: {last[:200]}")
                           # Extract all numbers (including from fractions like "255/255")
                           nums = [int(n) for n in re.findall(r'\d+', last)]
                           print(f"Extracted numbers from summary: {nums}")

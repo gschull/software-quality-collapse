@@ -17,23 +17,43 @@ def setup_test_env():
 
 @pytest.fixture
 def test_db():
-    """Create a temporary test database."""
+    """Provide a temporary database for tests."""
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
+    # Use absolute path and unique identifier to prevent cross-mutation contamination
+    path = os.path.abspath(path)
     os.environ["DATABASE_URL"] = path
+    # Clean up any existing file (in case of mutation test weirdness)
+    if os.path.exists(path):
+        try:
+            os.unlink(path)
+        except:
+            pass
     yield path
+    # Clean up
     try:
-        os.unlink(path)
+        if os.path.exists(path):
+            os.unlink(path)
     except:
         pass
+    # Clean up environment to avoid pollution
+    if "DATABASE_URL" in os.environ:
+        del os.environ["DATABASE_URL"]
 
 
 @pytest.fixture
 def client(test_db):
-    """Create a test client with a fresh database."""
-    # Import after environment is set
+    """Provide a test client with a clean database."""
+    # Import after environment is set up
     from app import app, init_db
+    # Ensure fresh initialization
     init_db()
+    # Verify database is actually empty
+    from app import get_conn
+    conn = get_conn()
+    result = conn.execute("SELECT COUNT(*) as cnt FROM events").fetchone()
+    conn.close()
+    assert result["cnt"] == 0, f"Database not empty: {result['cnt']} events found"
     return TestClient(app)
 
 
