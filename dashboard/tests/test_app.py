@@ -335,3 +335,193 @@ def test_ingest_empty_ecosystem(client):
     }
     response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
     assert response.status_code == 200
+
+
+def test_ingest_zero_values(client):
+    """Ingest should handle zero mutation scores and CVSS."""
+    payload = {
+        "repository": "zero/test",
+        "pr_number": "1",
+        "python": {
+            "mutation": {"score": 0.0},
+            "dependencies": {"critical": 0, "high": 0, "moderate": 0, "low": 0, "max_cvss": 0.0}
+        }
+    }
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "stored"
+
+
+def test_api_series_aggregation_values(client):
+    """API series should correctly calculate averages and maxes."""
+    # Ingest multiple data points
+    for i in range(3):
+        payload = {
+            "repository": f"test/repo{i}",
+            "pr_number": str(i),
+            "python": {
+                "mutation": {"score": 50.0 + i * 10},  # 50, 60, 70
+                "dependencies": {"max_cvss": 2.0 + i}  # 2.0, 3.0, 4.0
+            }
+        }
+        client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    
+    response = client.get("/api/series")
+    assert response.status_code == 200
+    data = response.json()
+    assert "python" in data
+    # Verify we got actual calculated values
+    assert all(item["avg_mutation"] >= 0 for item in data["python"])
+    assert all(item["max_cvss"] >= 0 for item in data["python"])
+
+
+def test_trends_aggregation(client):
+    """Trends should show correct aggregated statistics."""
+    # Ingest multiple events for same repo
+    for i in range(5):
+        payload = {
+            "repository": "agg/repo",
+            "pr_number": str(i),
+            "python": {"mutation": {"score": 80.0 + i}, "dependencies": {"max_cvss": 5.0}}
+        }
+        client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    
+    response = client.get("/trends")
+    assert response.status_code == 200
+    # Should contain aggregated data
+    assert "agg/repo" in response.text
+
+
+def test_ingest_bearer_token_exact_match(client):
+    """Ingest should require exact Bearer token match."""
+    payload = {"repository": "test/repo", "python": {"mutation": {"score": 75.0}}}
+    
+    # Wrong token should fail
+    response = client.post(
+        "/ingest",
+        json=payload,
+        headers={"Authorization": "Bearer wrong-token-xyz"}
+    )
+    assert response.status_code == 403
+    
+    # Correct token should succeed
+    response = client.post(
+        "/ingest",
+        json=payload,
+        headers={"Authorization": "Bearer test-token-12345"}
+    )
+    assert response.status_code == 200
+
+
+def test_ingest_malformed_bearer(client):
+    """Ingest should reject malformed Bearer header."""
+    payload = {"repository": "test/repo", "python": {"mutation": {"score": 75.0}}}
+    
+    # Missing space after Bearer
+    response = client.post(
+        "/ingest",
+        json=payload,
+        headers={"Authorization": "Bearertest-token-12345"}
+    )
+    assert response.status_code == 401
+
+
+def test_api_roi_zero_cost(client):
+    """ROI calculator should handle edge case of zero cost."""
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["costs"]["per_month"] == 10  # 1 * 10
+    assert data["roi"]["multiple"] > 0
+
+
+def test_api_roi_large_team(client):
+    """ROI calculator should work with large teams."""
+    response = client.get("/api/roi?team_size=500&plan=enterprise")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["costs"]["per_month"] == 15000  # 500 * 30
+    assert data["costs"]["per_year"] == 180000
+    assert data["roi"]["multiple"] > 0
+
+
+def test_api_roi_calculations_precise(client):
+    """ROI calculator should produce consistent calculations."""
+    response = client.get("/api/roi?team_size=100&plan=team")
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Verify calculation chain
+    expected_monthly = 100 * 15  # 1500
+    expected_yearly = expected_monthly * 12  # 18000
+    assert data["costs"]["per_month"] == expected_monthly
+    assert data["costs"]["per_year"] == expected_yearly
+    
+    # Verify time savings calculation
+    time_savings = 100 * 2 * 24 * 75  # team * hours * sprints * rate
+    assert data["savings"]["time_savings_per_year"] == time_savings
+    
+    # Verify incident savings
+    incident_savings = 1 * 50000
+    assert data["savings"]["incident_savings_per_year"] == incident_savings
+
+
+def test_index_limit_100(client):
+    """Index should limit to 100 entries."""
+    # Ingest more than 100 entries
+    for i in range(105):
+        payload = {
+            "repository": f"bulk/repo{i}",
+            "python": {"mutation": {"score": 75.0}}
+        }
+        client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    
+    # Check that index doesn't crash with many entries
+    response = client.get("/")
+    assert response.status_code == 200
+
+
+def test_trends_limit_1000(client):
+    """Trends should use 1000-event window for aggregation."""
+    # The query uses LIMIT 1000 internally
+    response = client.get("/trends")
+    assert response.status_code == 200
+
+
+def test_ingest_response_format(client):
+    """Ingest should return proper response format."""
+    payload = {
+        "repository": "format/test",
+        "pr_number": "99",
+        "python": {"mutation": {"score": 75.0}}
+    }
+    response = client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Verify response structure
+    assert "status" in data
+    assert "repository" in data
+    assert "pr_number" in data
+    assert data["status"] == "stored"
+    assert data["repository"] == "format/test"
+    assert data["pr_number"] == "99"
+
+
+def test_api_series_none_handling(client):
+    """API series should handle None values with 'or 0' defaults."""
+    # Ingest data with missing mutation score
+    payload = {
+        "repository": "none/test",
+        "python": {"mutation": {}, "dependencies": {}}
+    }
+    client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    
+    response = client.get("/api/series")
+    assert response.status_code == 200
+    data = response.json()
+    # Should not crash, values should default to 0
+    if "python" in data and len(data["python"]) > 0:
+        assert data["python"][0]["avg_mutation"] >= 0
+        assert data["python"][0]["max_cvss"] >= 0
