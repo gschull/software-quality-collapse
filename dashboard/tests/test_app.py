@@ -1009,3 +1009,105 @@ def test_ecosystem_loop_iterates_python_java_node(client):
     # Should have exactly python, java, node (not rust)
     assert ecosystems == {"python", "java", "node"}
     assert "rust" not in ecosystems
+
+
+def test_roi_hours_saved_per_sprint_is_two(client):
+    """Test that hours_saved_per_dev_per_sprint constant is exactly 2."""
+    # For team_size=1, plan=pro ($10/month):
+    # hours_saved = 1 * 2 * 24 * 75 = 3600
+    # cost_per_year = 10 * 12 = 120
+    # time_savings_per_year = 3600
+    # total_value = 3600 + 50000 = 53600
+    # roi_multiple = 53600 / 120 = 446.7
+    
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    data = response.json()
+    
+    # If hours_saved was mutated from 2 to 1 or 3:
+    # With 1: time_savings = 1*1*24*75 = 1800, total=51800, roi=431.7
+    # With 3: time_savings = 1*3*24*75 = 5400, total=55400, roi=461.7
+    assert data["savings"]["time_savings_per_year"] == 3600
+
+
+def test_roi_sprints_per_year_is_twentyfour(client):
+    """Test that sprints_per_year constant is exactly 24."""
+    # For team_size=1, plan=pro:
+    # hours_saved = 1 * 2 * 24 * 75 = 3600
+    
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    data = response.json()
+    
+    # If sprints_per_year was mutated from 24 to 23 or 25:
+    # With 23: time_savings = 1*2*23*75 = 3450, total=53450, roi=445.4
+    # With 25: time_savings = 1*2*25*75 = 3750, total=53750, roi=447.9
+    assert data["savings"]["time_savings_per_year"] == 3600
+
+
+def test_roi_hourly_rate_is_seventyfive(client):
+    """Test that hourly_rate constant is exactly 75."""
+    # For team_size=1, plan=pro:
+    # hours_saved = 1 * 2 * 24 * 75 = 3600
+    
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    data = response.json()
+    
+    # If hourly_rate was mutated from 75 to 74 or 76:
+    # With 74: time_savings = 1*2*24*74 = 3552, total=53552, roi=446.3
+    # With 76: time_savings = 1*2*24*76 = 3648, total=53648, roi=447.1
+    assert data["savings"]["time_savings_per_year"] == 3600
+
+
+def test_roi_incidents_prevented_is_one(client):
+    """Test that incidents_prevented_per_year is exactly 1."""
+    response = client.get("/api/roi?team_size=10&plan=pro")
+    data = response.json()
+    
+    # incident_savings = 1 * 50000 = 50000
+    # If mutated to 0: incident_savings = 0
+    # If mutated to 2: incident_savings = 100000
+    assert data["savings"]["incident_savings_per_year"] == 50000
+
+
+def test_roi_incident_cost_is_fifty_thousand(client):
+    """Test that incident_cost constant is exactly 50000."""
+    response = client.get("/api/roi?team_size=10&plan=pro")
+    data = response.json()
+    
+    # incident_savings = 1 * 50000 = 50000
+    # If mutated to 49999 or 50001: would change result
+    assert data["savings"]["incident_savings_per_year"] == 50000
+
+
+def test_roi_cost_per_year_multiply_by_twelve(client):
+    """Test that cost_per_year is cost_per_month * 12 (not 11 or 13)."""
+    # team_size=10, plan=pro: cost_per_month = 10*10 = 100
+    response = client.get("/api/roi?team_size=10&plan=pro")
+    data = response.json()
+    
+    # cost_per_year should be 100 * 12 = 1200
+    # If mutated to * 11: 1100
+    # If mutated to * 13: 1300
+    assert data["costs"]["per_year"] == 1200
+
+
+def test_roi_payback_uses_365_days(client):
+    """Test that payback_period_days uses 365 (not 364 or 366)."""
+    # team_size=1, plan=pro:
+    # roi_multiple = 446.7
+    # payback_period_days = round(365 / 446.7) = round(0.817) = 1
+    
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    data = response.json()
+    
+    # If 365 was mutated to 364 or 366: would change result
+    # With 365/446.7: ~0.817 → rounds to 1
+    # Need a case where the exact value matters
+    # Let's use a different team size where the rounding shows the difference
+    
+    response = client.get("/api/roi?team_size=50&plan=pro")
+    data = response.json()
+    
+    # For team_size=50: cost=500*12=6000, time_savings=50*2*24*75=180000
+    # total_value=180000+50000=230000, roi=230000/6000=38.3
+    # payback=365/38.3=9.5 → rounds to 10 days
+    assert data["roi"]["payback_period_days"] == 10
