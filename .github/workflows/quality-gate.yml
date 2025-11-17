@@ -176,9 +176,12 @@ jobs:
                           if len(nums) >= 4:
                               # First two are the fraction (255/255), skip them
                               counters = nums[2:] if len(nums) > 2 else nums
-                              # killed is usually first counter, survived is the largest
+                              # killed is usually first counter
                               killed = counters[0] if len(counters) > 0 else 0
-                              survived = max((n for n in counters if n > 10), default=0)  # survived is typically large
+                              # survived is typically the second-largest or last significant counter
+                              # Look for the largest non-zero counter after killed
+                              remaining = [n for n in counters[1:] if n > 0]
+                              survived = max(remaining) if remaining else 0
                               timeout = 0  # usually 0 in output
                               considered = killed + survived + timeout
                               if considered > 0:
