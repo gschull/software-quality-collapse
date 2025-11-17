@@ -13,7 +13,10 @@ INGEST_TOKEN = os.environ.get("INGEST_TOKEN", "change-me")
 
 app = FastAPI(title="Quality Gate Dashboard", version="0.1.0")
 
-BASE_DIR = os.path.dirname(__file__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Handle mutmut's mutants/ directory structure
+if BASE_DIR.endswith("mutants"):
+    BASE_DIR = os.path.dirname(BASE_DIR)
 templates_env = Environment(
     loader=FileSystemLoader(os.path.join(BASE_DIR, "templates")),
     autoescape=select_autoescape(["html", "xml"]),

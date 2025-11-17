@@ -136,21 +136,34 @@ jobs:
                       run_log = Path('mutmut_run.log')
                       if run_log.exists():
                           log_text = run_log.read_text(encoding='utf-8', errors='ignore')
-                          # The final summary is the line right before "mutations/second"
                           lines = log_text.splitlines()
+                          
+                          # Check if mutmut failed to complete
+                          failed_to_collect = any('failed to collect stats' in line for line in lines)
+                          if failed_to_collect:
+                              print("Mutmut failed to complete - will report 0 mutants")
+                          
+                          # The final summary is the line right before "mutations/second"
                           last = ''
                           for i, line in enumerate(lines):
                               if 'mutations/second' in line and i > 0:
-                                  last = lines[i-1]
+                                  # Look backwards for the summary line, skipping warnings
+                                  for j in range(i-1, max(0, i-5), -1):
+                                      candidate = lines[j]
+                                      # Skip warning/deprecation lines
+                                      if 'Warning' not in candidate and 'DeprecationWarning' not in candidate and '/' in candidate:
+                                          last = candidate
+                                          break
                                   break
+                          
                           if not last:
                               # Fallback: find line matching pattern like "255/255" with multiple counters
-                              candidates = [l for l in lines if '/' in l and l.count(' ') > 5]
+                              # Skip lines with warnings
+                              candidates = [l for l in lines if '/' in l and l.count(' ') > 5 
+                                          and 'Warning' not in l and 'DeprecationWarning' not in l]
                               last = candidates[-1] if candidates else ''
+                          
                           print(f"mutmut_run.log last summary line: {last[:200]}")
-                          def pick(pat, s):
-                              m = re.search(pat, s, re.IGNORECASE)
-                              return int(m.group(1)) if m else None
                           # Extract all numbers (including from fractions like "255/255")
                           nums = [int(n) for n in re.findall(r'\d+', last)]
                           print(f"Extracted numbers from summary: {nums}")
