@@ -8,12 +8,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-DB_PATH = os.environ.get("DATABASE_URL", "metrics.db")
 INGEST_TOKEN = os.environ.get("INGEST_TOKEN", "change-me")
 
 app = FastAPI(title="Quality Gate Dashboard", version="0.1.0")
 
-BASE_DIR = os.path.dirname(__file__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Handle mutmut's mutants/ directory structure
+if BASE_DIR.endswith("mutants"):
+    BASE_DIR = os.path.dirname(BASE_DIR)
 templates_env = Environment(
     loader=FileSystemLoader(os.path.join(BASE_DIR, "templates")),
     autoescape=select_autoescape(["html", "xml"]),
@@ -21,7 +23,9 @@ templates_env = Environment(
 
 
 def get_conn():
-    con = sqlite3.connect(DB_PATH)
+    # Read DB_PATH dynamically to support test fixture DATABASE_URL changes
+    db_path = os.environ.get("DATABASE_URL", "metrics.db")
+    con = sqlite3.connect(db_path)
     con.row_factory = sqlite3.Row
     return con
 
