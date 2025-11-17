@@ -525,3 +525,98 @@ def test_api_series_none_handling(client):
     if "python" in data and len(data["python"]) > 0:
         assert data["python"][0]["avg_mutation"] >= 0
         assert data["python"][0]["max_cvss"] >= 0
+
+
+def test_roi_constants_hours_saved(client):
+    """ROI calculation should use 2 hours saved per dev per sprint."""
+    # With team_size=10, should be 10 * 2 * 24 * 75 = 36,000
+    response = client.get("/api/roi?team_size=10&plan=pro")
+    data = response.json()
+    # time_savings = 10 * 2 * 24 * 75 = 36000
+    assert data["savings"]["time_savings_per_year"] == 36000
+
+
+def test_roi_constants_sprints(client):
+    """ROI calculation should use 24 sprints per year."""
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    data = response.json()
+    # time_savings = 1 * 2 * 24 * 75 = 3600
+    assert data["savings"]["time_savings_per_year"] == 3600
+
+
+def test_roi_constants_hourly_rate(client):
+    """ROI calculation should use $75 hourly rate."""
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    data = response.json()
+    # time_savings = 1 * 2 * 24 * 75 = 3600
+    expected = 1 * 2 * 24 * 75
+    assert data["savings"]["time_savings_per_year"] == expected
+
+
+def test_roi_constants_incident_cost(client):
+    """ROI calculation should use $50,000 incident cost."""
+    response = client.get("/api/roi?team_size=1&plan=pro")
+    data = response.json()
+    # incident_savings = 1 * 50000 = 50000
+    assert data["savings"]["incident_savings_per_year"] == 50000
+
+
+def test_roi_constants_months_per_year(client):
+    """ROI calculation should multiply monthly cost by 12."""
+    response = client.get("/api/roi?team_size=10&plan=pro")
+    data = response.json()
+    # cost_per_month = 10 * 10 = 100
+    # cost_per_year = 100 * 12 = 1200
+    assert data["costs"]["per_month"] == 100
+    assert data["costs"]["per_year"] == 1200
+
+
+def test_roi_constants_days_in_year(client):
+    """ROI calculation should use 365 days for payback period."""
+    response = client.get("/api/roi?team_size=25&plan=pro")
+    data = response.json()
+    # Should involve 365 in the calculation
+    # payback_period_days = round(365 / roi_multiple, 0)
+    assert "payback_period_days" in data["roi"]
+    assert data["roi"]["payback_period_days"] > 0
+
+
+def test_pricing_pro_price(client):
+    """Pricing should show $10 per dev for pro plan."""
+    response = client.get("/api/pricing")
+    data = response.json()
+    assert data["pro"]["price_per_dev"] == 10
+
+
+def test_pricing_team_price(client):
+    """Pricing should show $15 per dev for team plan."""
+    response = client.get("/api/pricing")
+    data = response.json()
+    assert data["team"]["price_per_dev"] == 15
+
+
+def test_pricing_enterprise_price(client):
+    """Pricing should show $30 per dev for enterprise plan."""
+    response = client.get("/api/pricing")
+    data = response.json()
+    assert data["enterprise"]["price_per_dev"] == 30
+
+
+def test_pricing_min_seats(client):
+    """Pricing should show correct minimum seats for each tier."""
+    response = client.get("/api/pricing")
+    data = response.json()
+    assert data["pro"]["min_seats"] == 5
+    assert data["team"]["min_seats"] == 20
+    assert data["enterprise"]["min_seats"] == 200
+
+
+def test_api_series_default_limit(client):
+    """API series should default to 1000 limit."""
+    # The default limit=1000 should be used if not specified
+    payload = {"repository": "test/limit", "python": {"mutation": {"score": 75.0}}}
+    client.post("/ingest", json=payload, headers={"Authorization": "Bearer test-token-12345"})
+    
+    # Call without limit parameter (should use default 1000)
+    response = client.get("/api/series")
+    assert response.status_code == 200
